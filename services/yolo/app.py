@@ -8,6 +8,8 @@ import logging
 import os
 import uuid
 import shutil
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -97,7 +99,11 @@ def predict(file: UploadFile = File(...)):
     """
     Predict objects in an image
     """
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename)[1].lower() #to avoid case sensitivity issues 
+
+    if ext not in ALLOWED_EXTENSIONS or file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="File type not supported")
+    
     uid = str(uuid.uuid4())
     original_path = os.path.join(UPLOAD_DIR, uid + ext)
     predicted_path = os.path.join(PREDICTED_DIR, uid + ext)
@@ -188,4 +194,4 @@ if __name__ == "__main__":
 
     init_db()
     
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8081)
