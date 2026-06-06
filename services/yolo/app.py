@@ -8,6 +8,9 @@ import logging
 import os
 import uuid
 import shutil
+import time
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -94,10 +97,15 @@ def save_detection_object(prediction_uid, label, score, box):
 
 @app.post("/predict")
 def predict(file: UploadFile = File(...)):
+    start_time = time.time()
     """
     Predict objects in an image
     """
-    ext = os.path.splitext(file.filename)[1]
+    ext = os.path.splitext(file.filename)[1].lower() #to avoid case sensitivity issues 
+
+    if ext not in ALLOWED_EXTENSIONS or file.content_type not in ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="File type not supported")
+    
     uid = str(uuid.uuid4())
     original_path = os.path.join(UPLOAD_DIR, uid + ext)
     predicted_path = os.path.join(PREDICTED_DIR, uid + ext)
@@ -122,10 +130,13 @@ def predict(file: UploadFile = File(...)):
         save_detection_object(uid, label, score, bbox)
         detected_labels.append(label)
 
+    processing_time = round(time.time() - start_time, 2)
+
     return {
         "prediction_uid": uid, 
         "detection_count": len(results[0].boxes),
-        "labels": detected_labels
+        "labels": detected_labels,
+        "time_took": processing_time
     }
 
 @app.get("/prediction/{uid}")
@@ -188,4 +199,4 @@ if __name__ == "__main__":
 
     init_db()
     
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    uvicorn.run(app, host="0.0.0.0", port=8081)
