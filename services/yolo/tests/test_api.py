@@ -28,7 +28,7 @@ def test_health(client):
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
 
-
+ #check for file type , must be an image
 def test_predict_rejects_unsupported_file_type(client):
     response = client.post(
         "/predict",
