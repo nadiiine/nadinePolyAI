@@ -30,7 +30,7 @@ _raw_threshold = os.environ.get("CONFIDENCE_THRESHOLD")
 if _raw_threshold is not None:
     CONFIDENCE_THRESHOLD = float(_raw_threshold)
     logging.info(f"CONFIDENCE_THRESHOLD set to {CONFIDENCE_THRESHOLD} (from environment)")
-else:
+else:  # pragma: no cover
     CONFIDENCE_THRESHOLD = 0.5
     logging.info(f"CONFIDENCE_THRESHOLD not set, using default: {CONFIDENCE_THRESHOLD}")
 
@@ -186,7 +186,111 @@ def get_prediction_image(uid: str):
         raise HTTPException(status_code=404, detail="Image not found")
     return FileResponse(row[0])
 
+@app.get("/predictions/label/{label}")
+def get_predictions_by_label(label: str):  # receives a label string from the URL path parameter
+    """
+    Return all prediction sessions that contain at least one detected object
+    with the given label.
+    """
+    
+    label = label.strip()  # remove leading/trailing spaces from the input
 
+    if not label:
+        raise HTTPException(
+            status_code=400,
+            detail="Label cannot be empty"
+        )  # return error if the label is empty
+
+    with sqlite3.connect(DB_PATH) as conn:  # open connection to SQLite database
+        conn.row_factory = sqlite3.Row  # allow access by column names instead of indexes
+
+        rows = conn.execute("""
+            SELECT 
+                ps.uid,
+                ps.timestamp,
+                do.id,
+                do.label,
+                do.score,
+                do.box
+            FROM prediction_sessions ps
+            JOIN detection_objects do
+                ON ps.uid = do.prediction_uid
+            WHERE do.label = ?
+        """, (label,)).fetchall()
+        # get all detection objects with the requested label
+        # and join them with the prediction session they belong to
+
+    predictions = {}  # dictionary used to group objects under the same prediction session
+
+    for row in rows:  # iterate over every row returned from the SQL query
+
+        uid = row["uid"]  # get prediction session uid
+
+        if uid not in predictions:
+            # first time we see this prediction session
+            predictions[uid] = {
+                "uid": row["uid"],
+                "timestamp": row["timestamp"],
+                "detection_objects": []
+            }
+
+        predictions[uid]["detection_objects"].append({
+            "id": row["id"],
+            "label": row["label"],
+            "score": row["score"],
+            "box": row["box"]
+        })  # add current detection object to its prediction session
+
+    return list(predictions.values())  # return grouped prediction sessions as a list
+
+
+
+#2
+@app.get("/predictions/score/{min_score}")
+def get_detection_objects_by_score(min_score: float):  
+    # receives min_score from the URL path parameter as a float
+
+    """
+    Return all detection objects with confidence score >= min_score.
+    """
+
+    if min_score < 0.0 or min_score > 1.0:
+        # confidence score must be between 0.0 and 1.0
+        raise HTTPException(
+            status_code=400,
+            detail="min_score must be between 0.0 and 1.0"
+        )
+
+    with sqlite3.connect(DB_PATH) as conn:
+        # initiate connection to the SQLite database
+        conn.row_factory = sqlite3.Row
+
+        objects = conn.execute("""
+            SELECT id, prediction_uid, label, score, box
+            FROM detection_objects
+            WHERE score >= ?
+        """, (min_score,)).fetchall()
+
+        # retrieve all detection objects whose confidence score
+        # is greater than or equal to the requested min_score
+
+    
+
+    result = []
+
+    for obj in objects:
+     result.append({
+        "id": obj["id"],
+        "prediction_uid": obj["prediction_uid"],
+        "label": obj["label"],
+        "score": obj["score"],
+        "box": obj["box"]
+    })
+
+
+
+    return result
+    # return all matching detection objects as a list
 @app.get("/health")
 def health():
     """
@@ -194,7 +298,7 @@ def health():
     """
     return {"status": "ok"}
 
-if __name__ == "__main__":
+if __name__ == "__main__": # pragma: no cover
     import uvicorn
 
     init_db()
