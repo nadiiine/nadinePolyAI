@@ -25,7 +25,7 @@ jobs:
             git pull origin dev
             sudo systemctl restart yolo
             sleep 5
-            curl -f http://localhost:8081/ready
+            curl -f http://localhost:8081/docs
 
   deploy-prod:
     if: github.ref == 'refs/heads/main'
@@ -45,4 +45,4 @@ jobs:
             git pull origin main
             sudo systemctl restart yolo
             sleep 5
-            curl -f http://localhost:8081/ready
+            curl -f http://localhost:8081/docs
