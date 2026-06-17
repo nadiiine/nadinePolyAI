@@ -307,10 +307,14 @@ def get_detection_objects_by_score(min_score: float):
 
     #service ready check
 @app.get("/ready")
+
 def ready():
+    return {"status": "ready", "environment": "demo"}
     if is_shutting_down:
         raise HTTPException(status_code=503, detail="Service is shutting down")
-    return {"status": "ready"}
+   # new change
+#test test
+
     # return all matching detection objects as a list
 @app.get("/health")
 def health():
