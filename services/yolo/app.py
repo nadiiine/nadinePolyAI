@@ -22,7 +22,6 @@ def handle_sigterm(signum, frame):
     sys.exit(0)
 
 signal.signal(signal.SIGTERM, handle_sigterm)
-
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png"}
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png"}
 
@@ -304,24 +303,13 @@ def get_detection_objects_by_score(min_score: float):
 
 
     return result
-
-    #service ready check
-@app.get("/ready")
-
-def ready():
-    return {"status": "ready", "environment": "demo"}
-    if is_shutting_down:
-        raise HTTPException(status_code=503, detail="Service is shutting down")
-   # new change
-#test test
-
     # return all matching detection objects as a list
 @app.get("/health")
 def health():
     """
     Health check endpoint
     """
-    return {"status": "ok"}
+    return {"status": "ok", "goal":"demo"}
 
 if __name__ == "__main__": # pragma: no cover
     import uvicorn
