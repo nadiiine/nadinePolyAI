@@ -24,6 +24,8 @@ jobs:
             git checkout dev
             git pull origin dev
             sudo systemctl restart yolo
+            sudo systemctl restart agent
+            sudo systemctl restart frontend
             sleep 5
             curl -f http://localhost:8081/docs
 
@@ -44,5 +46,7 @@ jobs:
             git checkout main
             git pull origin main
             sudo systemctl restart yolo
+            sudo systemctl restart agent
+            sudo systemctl restart frontend
             sleep 5
             curl -f http://localhost:8081/docs
