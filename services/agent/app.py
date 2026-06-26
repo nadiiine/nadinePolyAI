@@ -3,9 +3,11 @@ import io
 import json
 import logging
 import os
+import uuid
 from contextvars import ContextVar
 from typing import Optional
 
+import boto3
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -20,14 +22,18 @@ import httpx
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.chat_models import init_chat_model
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
 YOLO_SERVICE_URL = os.environ.get("YOLO_SERVICE_URL", "http://localhost:8080")
 MODEL = os.environ.get("MODEL")
 
-# Text-only models
+AWS_REGION = os.environ["AWS_REGION"]
+AWS_S3_BUCKET = os.environ["AWS_S3_BUCKET"]
+
+s3 = boto3.client("s3", region_name=AWS_REGION)
+
 ALLOWED_MODELS = {
     "openai:gpt-5.4-mini",
     "anthropic:claude-haiku-4-5",
@@ -47,6 +53,7 @@ SYSTEM_PROMPT = (
 
 _current_image_b64: ContextVar[Optional[str]] = ContextVar("current_image_b64", default=None)
 
+
 @tool
 def detect_objects() -> str:
     """Detect and identify objects in the image provided by the user using YOLO object detection."""
@@ -55,16 +62,35 @@ def detect_objects() -> str:
         return json.dumps({"error": "No image was provided by the user."})
 
     image_bytes = base64.b64decode(image_b64)
-    with httpx.Client(timeout=30.0) as client:
+
+    chat_id = str(uuid.uuid4())
+    prediction_id = str(uuid.uuid4())
+    image_name = "image.jpg"
+
+    image_s3_key = f"{chat_id}/{prediction_id}/original/{image_name}"
+
+    s3.upload_fileobj(
+        io.BytesIO(image_bytes),
+        AWS_S3_BUCKET,
+        image_s3_key,
+        ExtraArgs={"ContentType": "image/jpeg"},
+    )
+
+    with httpx.Client(timeout=60.0) as client:
         response = client.post(
             f"{YOLO_SERVICE_URL}/predict",
-            files={"file": ("image.jpg", io.BytesIO(image_bytes), "image/jpeg")},
+            json={
+                "image_s3_key": image_s3_key,
+                "chat_id": chat_id,
+                "prediction_id": prediction_id,
+                "image_name": image_name,
+            },
         )
         response.raise_for_status()
+
     return json.dumps(response.json())
 
 
-# Registry: map tool name -> tool function
 TOOLS = {
     detect_objects.name: detect_objects
 }
@@ -72,27 +98,20 @@ TOOLS = {
 llm = init_chat_model(MODEL, temperature=0)
 llm_with_tools = llm.bind_tools(list(TOOLS.values()))
 
+
 def run_agent(history: list) -> str:
-    """
-    Simple ReAct loop:
-      1. Send messages to the LLM.
-      2. If the LLM requests tool calls, execute them and append results.
-      3. Repeat until the LLM returns a plain text response.
-    """
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + history
 
     while True:
         response: AIMessage = llm_with_tools.invoke(messages)
         messages.append(response)
 
-        # No tool calls, the model produced its final answer
         if not response.tool_calls:
             return response.content
 
-        # Execute every tool the model requested
         for tool_call in response.tool_calls:
             tool_fn = TOOLS[tool_call["name"]]
-            tool_result = tool_fn.invoke(tool_call)          # returns a ToolMessage
+            tool_result = tool_fn.invoke(tool_call)
             messages.append(tool_result)
 
 
@@ -107,13 +126,13 @@ app.add_middleware(
 
 
 class ChatMessage(BaseModel):
-    role: str                           # "user" or "assistant"
+    role: str
     content: str
-    image_base64: Optional[str] = None  # only on user messages that carry an image
+    image_base64: Optional[str] = None
 
 
 class ChatRequest(BaseModel):
-    messages: list[ChatMessage]         # full conversation thread, oldest first
+    messages: list[ChatMessage]
 
 
 class ChatResponse(BaseModel):
@@ -128,7 +147,7 @@ def chat(request: ChatRequest):
     for msg in request.messages:
         if msg.role == "user":
             if msg.image_base64:
-                latest_image = msg.image_base64          # saved for detect_objects tool
+                latest_image = msg.image_base64
                 content = msg.content + "\n[An image was uploaded. Use existing tools to analyze it according to user instructions.]"
             else:
                 content = msg.content
