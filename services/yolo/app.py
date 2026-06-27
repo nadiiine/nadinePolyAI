@@ -309,7 +309,7 @@ def health():
     """
     Health check endpoint
     """
-    return {"status": "ok", "goal":"demo"}
+    return {"status": "ok"}
 
 if __name__ == "__main__": # pragma: no cover
     import uvicorn
