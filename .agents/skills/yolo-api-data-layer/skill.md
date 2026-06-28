@@ -1,3 +1,11 @@
+---
+name: yolo-api-data-layer
+description: Refactors the YOLO service database layer from raw SQLite to SQLAlchemy and guides future database-related API changes including models, queries, schema changes, and backend configuration.
+version: "1.0.0"
+metadata:
+  author: "Nadine Zeibaq"
+---
+
 # YOLO API Data Layer Skill
  
 This skill standardizes all database-related work in the YOLO service. It governs the migration from raw SQLite to SQLAlchemy and applies to all future database-layer changes: adding models, modifying schemas, creating database-backed endpoints, or switching the database backend.
