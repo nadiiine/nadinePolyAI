@@ -24,7 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 from langchain_core.tools import tool
 from pydantic import BaseModel
 
-YOLO_SERVICE_URL = os.environ.get("YOLO_SERVICE_URL", "http://localhost:8080")
+YOLO_SERVICE_URL = os.environ.get("YOLO_SERVICE_URL", "http://localhost:8081")
 MODEL = os.environ.get("MODEL")
 
 # Text-only models
@@ -72,7 +72,7 @@ TOOLS = {
 llm = init_chat_model(MODEL, temperature=0)
 llm_with_tools = llm.bind_tools(list(TOOLS.values()))
 
-def run_agent(history: list) -> str:
+def run_agent(history: list, max_iterations: int = 10) -> str:
     """
     Simple ReAct loop:
       1. Send messages to the LLM.
@@ -81,20 +81,20 @@ def run_agent(history: list) -> str:
     """
     messages = [SystemMessage(content=SYSTEM_PROMPT)] + history
 
-    while True:
+    for _ in range(max_iterations):
         response: AIMessage = llm_with_tools.invoke(messages)
         messages.append(response)
-
+    
         # No tool calls, the model produced its final answer
         if not response.tool_calls:
             return response.content
-
+        
         # Execute every tool the model requested
         for tool_call in response.tool_calls:
             tool_fn = TOOLS[tool_call["name"]]
             tool_result = tool_fn.invoke(tool_call)          # returns a ToolMessage
             messages.append(tool_result)
-
+    return "I could not complete the request because the agent reached the maximum number of tool calls."
 
 app = FastAPI(title="Vision Agent")
 
