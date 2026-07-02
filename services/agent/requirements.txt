@@ -5,6 +5,8 @@ langchain
 langgraph
 langchain-core
 
+langchain-aws
+
 langchain[openai]
 langchain[anthropic]
 langchain[google-genai]
