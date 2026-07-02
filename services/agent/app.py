@@ -31,6 +31,7 @@ MODEL = os.environ.get("MODEL")
 ALLOWED_MODELS = {
     "openai:gpt-5.4-mini",
     "anthropic:claude-haiku-4-5",
+    "bedrock/anthropic.claude-3-haiku-20240307-v1:0"
 }
 
 if MODEL not in ALLOWED_MODELS:
