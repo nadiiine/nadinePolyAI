@@ -1,0 +1,57 @@
+
+{
+  "evals": [
+    {
+      "prompt": "refactor the api to use sqlalchemy",
+      "expected_output": [
+        "Creates services/yolo/database.py",
+        "Creates services/yolo/models.py",
+        "Removes sqlite3 usage",
+        "Uses SQLAlchemy ORM models",
+        "Uses Depends(get_db) for database sessions",
+        "Preserves existing API behavior",
+        "Runs pytest tests/"
+      ]
+    },
+    {
+      "prompt": "add an endpoint GET /predictions/recent that returns the 10 most recent sessions",
+      "expected_output": [
+        "Uses SQLAlchemy query instead of raw SQL",
+        "Uses PredictionSession model",
+        "Uses Depends(get_db)",
+        "Returns at most 10 prediction sessions",
+        "Adds or updates endpoint tests"
+      ]
+    },
+    {
+      "prompt": "add a UserFeedback table to track user ratings per prediction",
+      "expected_output": [
+        "Adds a SQLAlchemy UserFeedback model",
+        "Updates models.py instead of app.py",
+        "Uses SQLAlchemy relationships or foreign keys",
+        "Does not introduce raw SQL",
+        "Preserves existing API endpoints"
+      ]
+    },
+    {
+      "prompt": "delete a prediction session and all its detection objects by uid",
+      "expected_output": [
+        "Uses SQLAlchemy delete operations",
+        "Deletes related DetectionObject records",
+        "Uses db.commit()",
+        "Avoids sqlite3 and cursor.execute()",
+        "Adds tests for successful deletion"
+      ]
+    },
+    {
+      "prompt": "make the database backend configurable so we can use postgres in production",
+      "expected_output": [
+        "Uses DB_BACKEND environment variable",
+        "Keeps SQLite as the default backend",
+        "Supports PostgreSQL through DATABASE_URL",
+        "Uses SQLAlchemy create_engine()",
+        "Runs existing tests successfully"
+      ]
+    }
+  ]
+}

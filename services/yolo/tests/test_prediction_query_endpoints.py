@@ -1,99 +1,81 @@
-import sqlite3
+from datetime import datetime
 
-import app
+import database
+from app import app, init_db
 from fastapi.testclient import TestClient
+from models import DetectionObject, PredictionSession
 
 
-client = TestClient(app.app)
+client = TestClient(app)
 
 
 def setup_test_db(tmp_path):
-    test_db = tmp_path / "test_predictions.db"
-    app.DB_PATH = str(test_db)
-    app.init_db()
-  #insert fake data
-    with sqlite3.connect(app.DB_PATH) as conn:
-        # insert prediction sessions
-        conn.execute("""
-            INSERT INTO prediction_sessions (uid, timestamp, original_image, predicted_image)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-001",
-            "2026-06-07 10:00:00",
-            "uploads/original/img1.jpg",
-            "uploads/predicted/img1.jpg"
-        ))
+    database.DB_PATH = str(tmp_path / "test_predictions.db")
+    init_db()
 
-        conn.execute("""
-            INSERT INTO prediction_sessions (uid, timestamp, original_image, predicted_image)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-002",
-            "2026-06-07 11:00:00",
-            "uploads/original/img2.jpg",
-            "uploads/predicted/img2.jpg"
-        ))
+    db = database.SessionLocal()
+    try:
+        sessions = [
+            PredictionSession(
+                uid="session-001",
+                timestamp=datetime(2026, 6, 7, 10, 0, 0),
+                original_image="uploads/original/img1.jpg",
+                predicted_image="uploads/predicted/img1.jpg",
+            ),
+            PredictionSession(
+                uid="session-002",
+                timestamp=datetime(2026, 6, 7, 11, 0, 0),
+                original_image="uploads/original/img2.jpg",
+                predicted_image="uploads/predicted/img2.jpg",
+            ),
+            PredictionSession(
+                uid="session-003",
+                timestamp=datetime(2026, 6, 7, 12, 0, 0),
+                original_image="uploads/original/img3.jpg",
+                predicted_image="uploads/predicted/img3.jpg",
+            ),
+        ]
+        db.add_all(sessions)
 
-        conn.execute("""
-            INSERT INTO prediction_sessions (uid, timestamp, original_image, predicted_image)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-003",
-            "2026-06-07 12:00:00",
-            "uploads/original/img3.jpg",
-            "uploads/predicted/img3.jpg"
-        ))
-
-        # insert detection objects
-        conn.execute("""
-            INSERT INTO detection_objects (prediction_uid, label, score, box)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-001",
-            "person",
-            0.96,
-            "[15, 25, 150, 250]"
-        ))
-
-        conn.execute("""
-            INSERT INTO detection_objects (prediction_uid, label, score, box)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-001",
-            "dog",
-            0.82,
-            "[30, 40, 180, 280]"
-        ))
-
-        conn.execute("""
-            INSERT INTO detection_objects (prediction_uid, label, score, box)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-002",
-            "car",
-            0.65,
-            "[100, 120, 250, 300]"
-        ))
-
-        conn.execute("""
-            INSERT INTO detection_objects (prediction_uid, label, score, box)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-002",
-            "person",
-            0.51,
-            "[50, 60, 120, 220]"
-        ))
-
-        conn.execute("""
-            INSERT INTO detection_objects (prediction_uid, label, score, box)
-            VALUES (?, ?, ?, ?)
-        """, (
-            "session-003",
-            "bicycle",
-            0.33,
-            "[10, 15, 90, 140]"
-        ))
+        detections = [
+            DetectionObject(
+                prediction_uid="session-001",
+                label="person",
+                score=0.96,
+                box="[15, 25, 150, 250]",
+            ),
+            DetectionObject(
+                prediction_uid="session-001",
+                label="dog",
+                score=0.82,
+                box="[30, 40, 180, 280]",
+            ),
+            DetectionObject(
+                prediction_uid="session-002",
+                label="car",
+                score=0.65,
+                box="[100, 120, 250, 300]",
+            ),
+            DetectionObject(
+                prediction_uid="session-002",
+                label="person",
+                score=0.51,
+                box="[50, 60, 120, 220]",
+            ),
+            DetectionObject(
+                prediction_uid="session-003",
+                label="bicycle",
+                score=0.33,
+                box="[10, 15, 90, 140]",
+            ),
+        ]
+        db.add_all(detections)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 # -------------------------
@@ -296,11 +278,16 @@ def test_get_prediction_image_success(tmp_path):
     predicted_file = tmp_path / "predicted.jpg"
     predicted_file.write_bytes(b"fake image content")
 
-    with sqlite3.connect(app.DB_PATH) as conn:
-        conn.execute(
-            "UPDATE prediction_sessions SET predicted_image = ? WHERE uid = ?",
-            (str(predicted_file), "session-001")
-        )
+    db = database.SessionLocal()
+    try:
+        session = db.query(PredictionSession).filter(PredictionSession.uid == "session-001").first()
+        session.predicted_image = str(predicted_file)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
     response = client.get("/prediction/session-001/image")
 

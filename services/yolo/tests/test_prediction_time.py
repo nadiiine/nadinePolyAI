@@ -2,7 +2,7 @@ import os
 import unittest
 import tempfile
 from fastapi.testclient import TestClient
-import app as app_module
+import database
 from app import app, init_db
 
 TEST_IMAGE = os.path.join(os.path.dirname(__file__), "data", "beatles.jpeg")
@@ -10,7 +10,7 @@ TEST_IMAGE = os.path.join(os.path.dirname(__file__), "data", "beatles.jpeg")
 
 class TestPredictionTime(unittest.TestCase):
     def setUp(self):
-        _, app_module.DB_PATH = tempfile.mkstemp(suffix=".db")
+        _, database.DB_PATH = tempfile.mkstemp(suffix=".db")
         init_db()
         self.client = TestClient(app)
 
